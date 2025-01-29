@@ -1,14 +1,16 @@
 <script lang="ts">
-	import ollama, { type Message } from "ollama"; // Import the Ollama library
-	import { Remarkable } from "remarkable";
-
-	const md = new Remarkable();
+	import ollama, { type Message, type ModelResponse } from "ollama"; // Import the Ollama library
+	import ParseMessage from "./ParseMessage.svelte";
+	import { onMount } from "svelte";
 
 	let message = $state("");
 	let messages = $state<Message[]>([]);
+	let models = $state<ModelResponse[]>([]);
+	let modelSelected = $state<string>("");
 
 	async function sendMessage(event: SubmitEvent) {
 		event.preventDefault();
+		console.log("Calling llama with", modelSelected, " model");
 
 		if (message.trim()) {
 			// Add the user's message to the chat
@@ -18,7 +20,7 @@
 			// Send the message to Ollama and get a response
 			try {
 				const response = await ollama.chat({
-					model: "deepseek-r1:14b",
+					model: "deepseek-r1:7b",
 					messages: messages,
 				});
 
@@ -33,12 +35,22 @@
 		}
 	}
 
-	const parseContent = (text: string) => {
-		return md.render(text);
-	};
+	onMount(async () => {
+		const response = await ollama.list();
+		models = response.models;
+		modelSelected = models[1].name;
+	});
 </script>
 
 <div class="chat-view">
+	<div class="chat-view__models">
+		<label for="model"> Change your model </label>
+		<select bind:value={modelSelected} name="model" id="model">
+			{#each models as mod}
+				<option value={mod.name}>{mod.name}</option>
+			{/each}
+		</select>
+	</div>
 	<div class="messages">
 		{#each messages as msg}
 			{#if msg.role === "user"}
@@ -48,19 +60,21 @@
 				</div>
 			{:else}
 				<div class="message {msg.role}">
-					<strong>{msg.role}:</strong>
-					{@html parseContent(msg.content)}
+					<strong>Chat</strong>
+					<ParseMessage content={msg.content} />
 				</div>
 			{/if}
 		{/each}
 	</div>
-	<form class="message__wrapper" onsubmit={sendMessage}>
-		<input
-			class="message__input"
-			bind:value={message}
-			placeholder="Type a message..."
-		/>
-	</form>
+	<div>
+		<form class="message__wrapper" onsubmit={sendMessage}>
+			<input
+				class="message__input"
+				bind:value={message}
+				placeholder="Type a message..."
+			/>
+		</form>
+	</div>
 </div>
 
 <style>
@@ -71,6 +85,10 @@
 		padding: 10px;
 		user-select: text !important;
 		-webkit-user-select: text !important;
+		display: relative;
+	}
+	.chat-view__models {
+		text-align: end;
 	}
 	.messages {
 		flex-grow: 1;
