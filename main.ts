@@ -1,14 +1,14 @@
 import { Plugin, WorkspaceLeaf } from 'obsidian';
-import { ChatView, VIEW_TYPE_EXAMPLE } from './src/ExampleView';
+import { ChatView, VIEW_TYPE_EXAMPLE } from './src/NoumenaView';
 
-export default class ExamplePlugin extends Plugin {
+export default class NoumenaPlugin extends Plugin {
 	async onload() {
 		this.registerView(
 			VIEW_TYPE_EXAMPLE,
 			(leaf) => new ChatView(leaf)
 		);
 
-		this.addRibbonIcon('dice', 'Activate view', () => {
+		this.addRibbonIcon('origami', 'Open Ollama', () => {
 			this.activateView();
 		});
 	}

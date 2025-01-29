@@ -4,7 +4,7 @@ import { ItemView, WorkspaceLeaf } from 'obsidian';
 import Chat from './Chat.svelte';
 import { mount } from 'svelte';
 
-export const VIEW_TYPE_EXAMPLE = 'example-view';
+export const VIEW_TYPE_EXAMPLE = 'ollama-chat-view';
 
 export class ChatView extends ItemView {
 
@@ -17,7 +17,7 @@ export class ChatView extends ItemView {
 	}
 
 	getDisplayText() {
-		return 'Example view';
+		return 'Ollama Chat';
 	}
 
 	async onOpen() {
