@@ -77,6 +77,8 @@
 		flex-direction: column;
 		height: 100%;
 		padding: 10px;
+		user-select: text !important;
+		-webkit-user-select: text !important;
 	}
 	.messages {
 		flex-grow: 1;
