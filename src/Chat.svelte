@@ -2,72 +2,64 @@
 	import ollama, { type Message } from "ollama"; // Import the Ollama library
 	import { Remarkable } from "remarkable";
 
-	interface ChatMessage {
-		sender: "user" | "model";
-		text: string | Message;
-	}
-
 	const md = new Remarkable();
 
 	let message = $state("");
-	let messages = $state<ChatMessage[]>([]);
+	let messages = $state<Message[]>([]);
 
 	async function sendMessage(event: SubmitEvent) {
 		event.preventDefault();
 
 		if (message.trim()) {
 			// Add the user's message to the chat
-			messages.push({ sender: "user", text: message });
-			const userMessage = message;
+			messages.push({ role: "user", content: message });
 			message = "";
 
 			// Send the message to Ollama and get a response
 			try {
 				const response = await ollama.chat({
 					model: "deepseek-r1:14b",
-					messages: [{ role: "user", content: userMessage }],
+					messages: messages,
 				});
 
-				let chatMsg = md.render(response.message.content);
-
-				messages.push({
-					sender: "model",
-					text: chatMsg,
-				});
+				messages.push(response.message);
 			} catch (error) {
 				console.error("Error communicating with Ollama:", error);
 				messages = [
 					...messages,
-					{ sender: "model", text: "Failed to get a response." },
+					{ role: "assistant", content: "Failed to get a response." },
 				];
 			}
 		}
 	}
+
+	const parseContent = (text: string) => {
+		return md.render(text);
+	};
 </script>
 
 <div class="chat-view">
 	<div class="messages">
 		{#each messages as msg}
-			{#if msg.sender === "user"}
-				<div class="message {msg.sender}">
-					<strong>{msg.sender}:</strong>
-					{msg.text}
+			{#if msg.role === "user"}
+				<div class="message {msg.role}">
+					<strong>You</strong>
+					{msg.content}
 				</div>
 			{:else}
-				<div class="message {msg.sender}">
-					<strong>{msg.sender}:</strong>
-					{@html msg.text}
+				<div class="message {msg.role}">
+					<strong>{msg.role}:</strong>
+					{@html parseContent(msg.content)}
 				</div>
 			{/if}
 		{/each}
 	</div>
 	<form class="message__wrapper" onsubmit={sendMessage}>
 		<input
-			class="message"
+			class="message__input"
 			bind:value={message}
 			placeholder="Type a message..."
 		/>
-		<button type="submit">Send</button>
 	</form>
 </div>
 
@@ -88,13 +80,27 @@
 		margin-bottom: 10px;
 	}
 	.message__wrapper {
-		display: grid;
-		grid-template-columns: 80% 20%;
-		gap: 10px;
+		display: flex;
+		width: 100%;
 	}
+
 	.message.user {
 		color: white;
+		margin-bottom: 4px;
 	}
+
+	.message.model {
+		margin-bottom: 4px;
+	}
+
+	.message__input {
+		width: 100%;
+		border: 1px solid #ddd;
+		border-radius: 4px;
+		background-color: transparent;
+		padding: 8px;
+	}
+
 	input {
 		margin-bottom: 10px;
 	}
