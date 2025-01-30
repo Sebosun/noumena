@@ -1,9 +1,13 @@
-import { Plugin, WorkspaceLeaf, MarkdownView } from 'obsidian';
+import { Plugin, WorkspaceLeaf, MarkdownView, App, PluginSettingTab, Setting } from 'obsidian';
 import { ChatView, VIEW_TYPE_EXAMPLE } from './src/NoumenaView';
-import { SummarizeModal } from './SummarizeModal';
+import Settings from './src/Settings.svelte';
+import { mount } from 'svelte';
+import { type PluginSettings, DEFAULT_SETTINGS } from './PluginSettings';
+
 
 export default class NoumenaPlugin extends Plugin {
-	// TODO: Type state
+
+	settings: PluginSettings;
 
 	public state = {
 		action: "",
@@ -11,14 +15,18 @@ export default class NoumenaPlugin extends Plugin {
 	}
 
 	async onload() {
+		this.loadSettings();
+		this.addSettingTab(new NoumenaSettingsTab(this.app, this));
+
 		this.registerView(
 			VIEW_TYPE_EXAMPLE,
 			(leaf) => new ChatView(leaf, this)
 		);
 
-		this.addRibbonIcon('origami', 'Open Ollama', () => {
+		this.addRibbonIcon('origami', 'Open Noumena', () => {
 			this.activateView();
 		});
+
 
 		this.addCommand({
 			id: 'open-noumena',
@@ -34,10 +42,9 @@ export default class NoumenaPlugin extends Plugin {
 			callback: () => {
 				this.state.action = "summarize";
 
-				const dupa = this.app.workspace.getActiveViewOfType(MarkdownView);
-				const doc = dupa?.editor.getDoc()
+				const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+				const doc = activeView?.editor.getDoc()
 				const viewText = doc?.getValue();
-				const message = "You are a good teacher. Help the student to understand the concept of the topic. Explain the topic in a simple way.";
 				if (!viewText) return
 
 				this.state.documentToSummarize = viewText;
@@ -75,20 +82,59 @@ export default class NoumenaPlugin extends Plugin {
 		leaf = workspace.getRightLeaf(false);
 		await leaf?.setViewState({ type: VIEW_TYPE_EXAMPLE, active: true });
 
-		const leaves = workspace.getLeavesOfType(VIEW_TYPE_EXAMPLE);
-		if (leaves.length > 0) {
-			// A leaf with our view already exists, use that
-			leaf = leaves[0];
-		} else {
-			// Our view could not be found in the workspace, create a new leaf
-			// in the right sidebar for it
-			leaf = workspace.getRightLeaf(false);
-			await leaf?.setViewState({ type: VIEW_TYPE_EXAMPLE, active: true });
+		/* const leaves = workspace.getLeavesOfType(VIEW_TYPE_EXAMPLE); */
+		/* if (leaves.length > 0) { */
+		/* 	// A leaf with our view already exists, use that */
+		/* 	leaf = leaves[0]; */
+		/* } else { */
+		/* 	// Our view could not be found in the workspace, create a new leaf */
+		/* 	// in the right sidebar for it */
+		/* 	leaf = workspace.getRightLeaf(false); */
+		/* 	await leaf?.setViewState({ type: VIEW_TYPE_EXAMPLE, active: true }); */
+		/* } */
+		/**/
+		/* // "Reveal" the leaf in case it is in a collapsed sidebar */
+		/* if (leaf) { */
+		/* 	workspace.revealLeaf(leaf); */
+		/* } */
+	}
+
+
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
+	}
+}
+
+
+export class NoumenaSettingsTab extends PluginSettingTab {
+	plugin: NoumenaPlugin;
+	public chat: ReturnType<typeof mount>;
+
+	constructor(app: App, plugin: NoumenaPlugin) {
+		super(app, plugin);
+		this.plugin = plugin;
+	}
+
+	display(): void {
+		let { containerEl } = this;
+
+		containerEl.empty();
+
+		const onSaveSettings = async (setting: string) => {
+			this.plugin.settings.model = setting;
+			await this.plugin.saveSettings();
 		}
 
-		// "Reveal" the leaf in case it is in a collapsed sidebar
-		if (leaf) {
-			workspace.revealLeaf(leaf);
-		}
+		this.chat = mount(Settings, {
+			target: this.containerEl,
+			props: {
+				saveSettings: onSaveSettings,
+				userSettings: this.plugin.settings
+			}
+		});
 	}
 }
