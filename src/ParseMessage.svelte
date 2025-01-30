@@ -37,8 +37,6 @@
 			const element = splitContent[i];
 			rest.push(element);
 		}
-		console.log(thoughtsAcc);
-		console.log(rest);
 		return {
 			thoughts: thoughtsAcc
 				.join("\n")

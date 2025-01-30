@@ -1,16 +1,50 @@
 <script lang="ts">
+	import type { ActionTypes } from "./ActionTypes";
 	import ollama, { type Message, type ModelResponse } from "ollama"; // Import the Ollama library
 	import ParseMessage from "./ParseMessage.svelte";
 	import { onMount } from "svelte";
 
+	let isLoading = $state(false);
 	let message = $state("");
 	let messages = $state<Message[]>([]);
 	let models = $state<ModelResponse[]>([]);
 	let modelSelected = $state<string>("");
 
+	let { action, summaryDoc }: { action: ActionTypes; summaryDoc: string } =
+		$props();
+
+	onMount(async () => {
+		const listResponse = await ollama.list();
+		models = listResponse.models;
+		modelSelected = models[1].name;
+
+		if (action === "summarize") {
+			messages.push({ role: "system", content: summaryDoc });
+			messages.push({
+				role: "system",
+				content:
+					"You are a good teacher. Help the student to understand the concept of this topic. Explain the topic in a simple way.",
+			});
+			messages.push({ role: "system", content: summaryDoc });
+
+			const response = await ollama.chat({
+				model: modelSelected,
+				messages: messages,
+				stream: true,
+			});
+
+			messages.push({ role: "model", content: "" });
+
+			const lastMsg = messages.length - 1;
+
+			for await (const part of response) {
+				messages[lastMsg].content += part.message.content;
+			}
+		}
+	});
+
 	async function sendMessage(event: SubmitEvent) {
 		event.preventDefault();
-		console.log("Calling llama with", modelSelected, " model");
 
 		if (message.trim()) {
 			// Add the user's message to the chat
@@ -20,11 +54,18 @@
 			// Send the message to Ollama and get a response
 			try {
 				const response = await ollama.chat({
-					model: "deepseek-r1:7b",
+					model: modelSelected,
 					messages: messages,
+					stream: true,
 				});
 
-				messages.push(response.message);
+				messages.push({ role: "model", content: "" });
+
+				const lastMsg = messages.length - 1;
+
+				for await (const part of response) {
+					messages[lastMsg].content += part.message.content;
+				}
 			} catch (error) {
 				console.error("Error communicating with Ollama:", error);
 				messages = [
@@ -34,12 +75,6 @@
 			}
 		}
 	}
-
-	onMount(async () => {
-		const response = await ollama.list();
-		models = response.models;
-		modelSelected = models[1].name;
-	});
 </script>
 
 <div class="chat-view">
@@ -50,6 +85,8 @@
 				<option value={mod.name}>{mod.name}</option>
 			{/each}
 		</select>
+
+		<button onclick={() => (messages = [])}>Reset</button>
 	</div>
 	<div class="messages">
 		{#each messages as msg}
@@ -58,7 +95,7 @@
 					<strong>You</strong>
 					{msg.content}
 				</div>
-			{:else}
+			{:else if msg.role === "model"}
 				<div class="message {msg.role}">
 					<strong>Chat</strong>
 					<ParseMessage content={msg.content} />

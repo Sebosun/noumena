@@ -8,8 +8,8 @@
 	let { children, title } = $props();
 </script>
 
-<div class="expandable" role="none" onclick={onHeaderClick}>
-	<div class="expandable__header">
+<div class="expandable">
+	<div role="none" class="expandable__header" onclick={onHeaderClick}>
 		{title}
 
 		<div>
