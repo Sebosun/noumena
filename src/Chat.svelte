@@ -2,77 +2,91 @@
 	import type { ActionTypes } from "./ActionTypes";
 	import ollama, { type Message, type ModelResponse } from "ollama"; // Import the Ollama library
 	import ParseMessage from "./ParseMessage.svelte";
+	import { type PluginSettings } from "../PluginSettings";
 	import { onMount } from "svelte";
 
 	let isLoading = $state(false);
+
+	interface Props {
+		action: ActionTypes;
+		summaryDoc: string;
+		settings: PluginSettings;
+	}
+
+	interface MessagesDisplay {
+		role: "user" | "model" | "system" | "assistant";
+		content: string;
+		hide?: boolean;
+	}
+
 	let message = $state("");
-	let messages = $state<Message[]>([]);
+	let messagesState = $state<MessagesDisplay[]>([]);
 	let models = $state<ModelResponse[]>([]);
 	let modelSelected = $state<string>("");
 
-	let { action, summaryDoc }: { action: ActionTypes; summaryDoc: string } =
-		$props();
+	let { action, summaryDoc, settings }: Props = $props();
+
+	const sendMessage = async () => {
+		try {
+			const response = await ollama.chat({
+				model: modelSelected,
+				messages: messagesState,
+				stream: true,
+			});
+
+			messagesState.push({ role: "model", content: "" });
+			const lastMsg = messagesState.length - 1;
+
+			for await (const part of response) {
+				messagesState[lastMsg].content += part.message.content;
+			}
+		} catch (e) {
+			console.error("Error communicating with Ollama:", e);
+			messagesState = [
+				...messagesState,
+				{ role: "assistant", content: "Failed to get a response." },
+			];
+		}
+	};
+
+	const runSummarize = async () => {
+		messagesState.push({
+			role: "system",
+			hide: true,
+			content:
+				"You are a good teacher. Help the student to understand the concept of this topic. Explain the topic in a simple way.",
+		});
+		messagesState.push({ role: "user", content: summaryDoc, hide: true });
+		await sendMessage();
+
+		action = "chat";
+	};
 
 	onMount(async () => {
 		const listResponse = await ollama.list();
 		models = listResponse.models;
-		modelSelected = models[1].name;
+		modelSelected = models[0].name;
 
 		if (action === "summarize") {
-			messages.push({ role: "system", content: summaryDoc });
-			messages.push({
-				role: "system",
-				content:
-					"You are a good teacher. Help the student to understand the concept of this topic. Explain the topic in a simple way.",
-			});
-			messages.push({ role: "system", content: summaryDoc });
+			runSummarize();
+		}
 
-			const response = await ollama.chat({
-				model: modelSelected,
-				messages: messages,
-				stream: true,
-			});
-
-			messages.push({ role: "model", content: "" });
-
-			const lastMsg = messages.length - 1;
-
-			for await (const part of response) {
-				messages[lastMsg].content += part.message.content;
-			}
+		if (settings.model) {
+			modelSelected = settings.model;
 		}
 	});
 
-	async function sendMessage(event: SubmitEvent) {
+	async function onKill() {
+		ollama.abort();
+	}
+
+	async function submit(event: SubmitEvent) {
 		event.preventDefault();
 
 		if (message.trim()) {
-			// Add the user's message to the chat
-			messages.push({ role: "user", content: message });
+			messagesState.push({ role: "user", content: message });
 			message = "";
-
-			// Send the message to Ollama and get a response
-			try {
-				const response = await ollama.chat({
-					model: modelSelected,
-					messages: messages,
-					stream: true,
-				});
-
-				messages.push({ role: "model", content: "" });
-
-				const lastMsg = messages.length - 1;
-
-				for await (const part of response) {
-					messages[lastMsg].content += part.message.content;
-				}
-			} catch (error) {
-				console.error("Error communicating with Ollama:", error);
-				messages = [
-					...messages,
-					{ role: "assistant", content: "Failed to get a response." },
-				];
-			}
+			sendMessage();
 		}
 	}
 </script>
@@ -86,16 +100,17 @@
 			{/each}
 		</select>
 
-		<button onclick={() => (messages = [])}>Reset</button>
+		<button onclick={() => (messagesState = [])}>Reset</button>
+		<button onclick={onKill}>Kill</button>
 	</div>
 	<div class="messages">
-		{#each messages as msg}
-			{#if msg.role === "user"}
+		{#each messagesState as msg}
+			{#if msg.role === "user" && msg.hide != true}
 				<div class="message {msg.role}">
 					<strong>You</strong>
 					{msg.content}
 				</div>
-			{:else if msg.role === "model"}
+			{:else if msg.role === "model" && msg.hide != true}
 				<div class="message {msg.role}">
 					<strong>Chat</strong>
 					<ParseMessage content={msg.content} />
@@ -104,8 +119,9 @@
 		{/each}
 	</div>
 	<div>
-		<form class="message__wrapper" onsubmit={sendMessage}>
+		<form class="message__wrapper" onsubmit={submit}>
 			<input
+				disabled={isLoading}
 				class="message__input"
 				bind:value={message}
 				placeholder="Type a message..."

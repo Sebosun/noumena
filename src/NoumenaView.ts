@@ -34,7 +34,8 @@ export class ChatView extends ItemView {
 			target: this.contentEl,
 			props: {
 				action: action,
-				summaryDoc: summaryArticle
+				summaryDoc: summaryArticle,
+				settings: this.plugin.settings
 			}
 		});
 		this.plugin.state.action = ''
