@@ -80,7 +80,7 @@
 		ollama.abort();
 	}
 
-	async function submit(event: SubmitEvent) {
+	async function submit(event: SubmitEvent | KeyboardEvent) {
 		event.preventDefault();
 
 		if (message.trim()) {
@@ -120,12 +120,18 @@
 	</div>
 	<div>
 		<form class="message__wrapper" onsubmit={submit}>
-			<input
+			<textarea
 				disabled={isLoading}
 				class="message__input"
 				bind:value={message}
 				placeholder="Type a message..."
-			/>
+				onkeydown={(e) => {
+					if (e.key === "Enter" && !e.shiftKey) {
+						e.preventDefault();
+						submit(e);
+					}
+				}}
+			></textarea>
 		</form>
 	</div>
 </div>
@@ -170,9 +176,5 @@
 		border-radius: 4px;
 		background-color: transparent;
 		padding: 8px;
-	}
-
-	input {
-		margin-bottom: 10px;
 	}
 </style>
