@@ -1,6 +1,7 @@
 <script lang="ts">
+	import Loader from "./Loader.svelte";
 	import type { ActionTypes } from "./ActionTypes";
-	import ollama, { type Message, type ModelResponse } from "ollama"; // Import the Ollama library
+	import ollama, { type ModelResponse } from "ollama"; // Import the Ollama library
 	import ParseMessage from "./ParseMessage.svelte";
 	import { type PluginSettings } from "../PluginSettings";
 	import { onMount } from "svelte";
@@ -28,6 +29,7 @@
 
 	const sendMessage = async () => {
 		try {
+			isLoading = true
 			const response = await ollama.chat({
 				model: modelSelected,
 				messages: messagesState,
@@ -37,7 +39,9 @@
 			messagesState.push({ role: "model", content: "" });
 			const lastMsg = messagesState.length - 1;
 
+			// doing this to avoid the flickering of the loader
 			for await (const part of response) {
+			isLoading = false
 				messagesState[lastMsg].content += part.message.content;
 			}
 		} catch (e) {
@@ -46,6 +50,8 @@
 				...messagesState,
 				{ role: "assistant", content: "Failed to get a response." },
 			];
+		} finally {
+			isLoading = false
 		}
 	};
 
@@ -117,6 +123,7 @@
 				</div>
 			{/if}
 		{/each}
+		<Loader isLoading={isLoading} />
 	</div>
 	<div>
 		<form class="message__wrapper" onsubmit={submit}>
